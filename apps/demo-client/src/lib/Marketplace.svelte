@@ -1,5 +1,5 @@
 <script>
-  import { createClient, getStoredToken, storeToken } from './lib/api.js';
+  import { createClient, getStoredToken, storeToken } from './api.js';
 
   let { apiBase } = $props();
 
