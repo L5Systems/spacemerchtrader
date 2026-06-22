@@ -1,0 +1,62 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Starfall Backend",
+      "type": "debugpy",
+      "request": "launch",
+      "preLaunchTask": "kill-port-8000",
+      "module": "uvicorn",
+      "args": [
+        "starfall.main:app",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8000"
+      ],
+      "jinja": true,
+      "justMyCode": true,
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Starfall Backend (reload)",
+      "type": "debugpy",
+      "request": "launch",
+      "preLaunchTask": "kill-port-8000",
+      "module": "uvicorn",
+      "args": [
+        "starfall.main:app",
+        "--reload",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8000"
+      ],
+      "jinja": true,
+      "justMyCode": true,
+      "subProcess": true,
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Demo Client Dev Server",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "${workspaceFolder}/apps/demo-client",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Demo Client (Chrome)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/apps/demo-client/src",
+      "preLaunchTask": "demo-client: dev"
+    }
+  ]
+}

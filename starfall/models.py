@@ -43,6 +43,37 @@ class AgentRunStatus(str, enum.Enum):
     FAILED = "failed"
 
 
+class ClientRole(str, enum.Enum):
+    TRADER = "trader"
+    LOGISTICS = "logistics"
+    ADMIN = "admin"
+
+
+class ClientStatus(str, enum.Enum):
+    PENDING = "pending"
+    ACTIVE = "active"
+    SUSPENDED = "suspended"
+
+
+class ServiceCategory(str, enum.Enum):
+    CONTAINER_ASSEMBLY = "container_assembly"
+    CONTAINER_AGGREGATOR = "container_aggregator"
+    GROUND_LAUNCH = "ground_launch"
+    CONTAINER_PORTER = "container_porter"
+    OFFWORLD_ENDPOINT = "offworld_endpoint"
+    OFFWORLD_DELIVERY = "offworld_delivery"
+
+
+SERVICE_CATEGORY_LABELS: dict[ServiceCategory, str] = {
+    ServiceCategory.CONTAINER_ASSEMBLY: "Container Assembly",
+    ServiceCategory.CONTAINER_AGGREGATOR: "Container Aggregator (Launch)",
+    ServiceCategory.GROUND_LAUNCH: "Ground Launch Provider",
+    ServiceCategory.CONTAINER_PORTER: "Container Porter",
+    ServiceCategory.OFFWORLD_ENDPOINT: "Offworld Endpoint",
+    ServiceCategory.OFFWORLD_DELIVERY: "Offworld Container Delivery",
+}
+
+
 class StarSystem(Base):
     __tablename__ = "star_systems"
 
@@ -175,3 +206,60 @@ class AgentRun(Base):
     output_json: Mapped[str] = mapped_column(Text, default="{}")
     reasoning: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Client(Base):
+    __tablename__ = "clients"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True)
+    password_hash: Mapped[str] = mapped_column(String(128))
+    display_name: Mapped[str] = mapped_column(String(128))
+    role: Mapped[ClientRole] = mapped_column(Enum(ClientRole), default=ClientRole.TRADER)
+    status: Mapped[ClientStatus] = mapped_column(Enum(ClientStatus), default=ClientStatus.ACTIVE)
+    api_token: Mapped[str] = mapped_column(String(64), unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    access_grants: Mapped[list["ClientAccess"]] = relationship(back_populates="client")
+
+
+class ClientAccess(Base):
+    __tablename__ = "client_access"
+    __table_args__ = (UniqueConstraint("client_id", "category"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"))
+    category: Mapped[ServiceCategory] = mapped_column(Enum(ServiceCategory))
+    enabled: Mapped[bool] = mapped_column(default=True)
+
+    client: Mapped["Client"] = relationship(back_populates="access_grants")
+
+
+class ServiceProvider(Base):
+    __tablename__ = "service_providers"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    name: Mapped[str] = mapped_column(String(128))
+    description: Mapped[str] = mapped_column(Text, default="")
+    home_system_id: Mapped[str] = mapped_column(ForeignKey("star_systems.id"))
+    verified: Mapped[bool] = mapped_column(default=True)
+    rating: Mapped[float] = mapped_column(Float, default=4.0)
+
+    offerings: Mapped[list["ServiceOffering"]] = relationship(back_populates="provider")
+    home_system: Mapped["StarSystem"] = relationship()
+
+
+class ServiceOffering(Base):
+    __tablename__ = "service_offerings"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    provider_id: Mapped[str] = mapped_column(ForeignKey("service_providers.id"))
+    category: Mapped[ServiceCategory] = mapped_column(Enum(ServiceCategory))
+    system_id: Mapped[str] = mapped_column(ForeignKey("star_systems.id"))
+    base_rate: Mapped[float] = mapped_column(Float)
+    capacity: Mapped[int] = mapped_column(Integer, default=100)
+    unit: Mapped[str] = mapped_column(String(32), default="container")
+    description: Mapped[str] = mapped_column(Text, default="")
+
+    provider: Mapped["ServiceProvider"] = relationship(back_populates="offerings")
+    system: Mapped["StarSystem"] = relationship()

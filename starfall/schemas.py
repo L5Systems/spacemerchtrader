@@ -3,7 +3,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from starfall.models import AgentRunStatus, OrderStatus, OrderType, ShipmentStatus
+from starfall.models import AgentRunStatus, ClientRole, ClientStatus, OrderStatus, OrderType, ServiceCategory, ShipmentStatus
 
 
 class HealthResponse(BaseModel):
@@ -116,3 +116,66 @@ class AgentRunOut(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class ClientSignup(BaseModel):
+    email: str = Field(..., examples=["trader@starfall.corp"])
+    password: str = Field(..., min_length=8)
+    display_name: str = Field(..., examples=["Aurora Trader"])
+    role: ClientRole = ClientRole.TRADER
+
+
+class ClientLogin(BaseModel):
+    email: str
+    password: str
+
+
+class ClientOut(BaseModel):
+    id: str
+    email: str
+    display_name: str
+    role: ClientRole
+    status: ClientStatus
+    access_token: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ServiceCategoryOut(BaseModel):
+    id: str
+    label: str
+    description: str
+
+
+class ServiceOfferingOut(BaseModel):
+    id: str
+    category: str
+    category_label: str
+    system_id: str
+    base_rate: float
+    capacity: int
+    unit: str
+    description: str
+
+
+class ServiceProviderOut(BaseModel):
+    id: str
+    name: str
+    description: str
+    home_system_id: str
+    verified: bool
+    rating: float
+    offerings: list[ServiceOfferingOut]
+
+
+class ClientAccessUpdate(BaseModel):
+    categories: list[ServiceCategory]
+
+
+class MarketplaceMenuOut(BaseModel):
+    client: dict[str, str]
+    access: list[str]
+    categories: list[ServiceCategoryOut]
+    providers_by_category: dict[str, list[dict[str, Any]]]
+    providers: list[ServiceProviderOut]

@@ -2,6 +2,7 @@
   import { createClient, SYSTEMS } from './lib/api.js';
   import Panel from './lib/Panel.svelte';
   import ResultView from './lib/ResultView.svelte';
+  import Marketplace from './lib/Marketplace.svelte';
 
   let apiBase = $state('/api');
   let client = $derived(createClient(apiBase));
@@ -247,8 +248,10 @@
     {/if}
   </header>
 
+  <Marketplace apiBase={apiBase} />
+
   <main class="grid">
-    <Panel title="Market Prices" subtitle="GET /markets/{system}/prices">
+    <Panel title="Market Prices" subtitle={'GET /markets/{system}/prices'}>
       {#snippet actions()}
         <button onclick={fetchMarket} disabled={marketLoading}>Refresh</button>
       {/snippet}
@@ -321,7 +324,7 @@
       {/snippet}
     </Panel>
 
-    <Panel title="Warehouse Stock" subtitle="GET /warehouses/{id}/stock">
+    <Panel title="Warehouse Stock" subtitle={'GET /warehouses/{id}/stock'}>
       {#snippet actions()}
         <button onclick={fetchStock} disabled={stockLoading}>Load</button>
       {/snippet}
@@ -429,7 +432,7 @@
       {/snippet}
     </Panel>
 
-    <Panel title="Order Lookup" subtitle="GET /orders/{id} and /shipment">
+    <Panel title="Order Lookup" subtitle={'GET /orders/{id} and /shipment'}>
       {#snippet actions()}
         <button onclick={lookupOrderById} disabled={lookupLoading}>Lookup</button>
       {/snippet}
@@ -446,7 +449,7 @@
       {/snippet}
     </Panel>
 
-    <Panel title="Handling Agents" subtitle="GET /agents · POST /agents/{id}/run">
+    <Panel title="Handling Agents" subtitle={'GET /agents · POST /agents/{id}/run'}>
       {#snippet actions()}
         <button onclick={fetchAgents} disabled={agentsLoading}>List</button>
         <button class="primary" onclick={triggerAgent}>Run agent</button>
@@ -508,6 +511,7 @@
     grid-template-columns: 1fr 260px;
     grid-template-areas:
       'hero hero'
+      'marketplace marketplace'
       'main activity';
   }
 
@@ -667,7 +671,7 @@
   @media (max-width: 1100px) {
     .app {
       grid-template-columns: 1fr;
-      grid-template-areas: 'hero' 'main' 'activity';
+      grid-template-areas: 'hero' 'marketplace' 'main' 'activity';
     }
 
     .activity {

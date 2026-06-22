@@ -1,14 +1,20 @@
 const DEFAULT_BASE = '/api';
+const TOKEN_KEY = 'starfall_marketplace_token';
 
-/** @param {string} baseUrl */
-export function createClient(baseUrl = DEFAULT_BASE) {
+/** @param {string} baseUrl @param {string} [token] */
+export function createClient(baseUrl = DEFAULT_BASE, token) {
   const base = baseUrl.replace(/\/$/, '');
 
   /** @param {string} path @param {RequestInit} [init] */
   async function request(path, init = {}) {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...init.headers,
+    };
     const res = await fetch(`${base}${path}`, {
-      headers: { 'Content-Type': 'application/json', ...init.headers },
       ...init,
+      headers,
     });
     const text = await res.text();
     let body = null;
@@ -27,6 +33,7 @@ export function createClient(baseUrl = DEFAULT_BASE) {
   }
 
   return {
+    request,
     health: () => request('/health'),
     marketPrices: (systemId) => request(`/markets/${systemId}/prices`),
     routeQuote: (origin, dest, qty = 1) =>
@@ -43,8 +50,36 @@ export function createClient(baseUrl = DEFAULT_BASE) {
         body: JSON.stringify({ trigger, payload }),
       }),
     getAgentRun: (runId) => request(`/agents/runs/${runId}`),
+    marketplaceCategories: () => request('/marketplace/categories'),
+    marketplaceProviders: (category, systemId) => {
+      const params = new URLSearchParams();
+      if (category) params.set('category', category);
+      if (systemId) params.set('system_id', systemId);
+      const q = params.toString();
+      return request(`/marketplace/providers${q ? `?${q}` : ''}`);
+    },
+    marketplaceSignup: (body) =>
+      request('/marketplace/signup', { method: 'POST', body: JSON.stringify(body) }),
+    marketplaceLogin: (body) =>
+      request('/marketplace/login', { method: 'POST', body: JSON.stringify(body) }),
+    marketplaceMe: () => request('/marketplace/me'),
+    marketplaceMenu: () => request('/marketplace/menu'),
   };
 }
+
+export function getStoredToken() {
+  return localStorage.getItem(TOKEN_KEY) ?? '';
+}
+
+export function storeToken(token) {
+  if (token) {
+    localStorage.setItem(TOKEN_KEY, token);
+  } else {
+    localStorage.removeItem(TOKEN_KEY);
+  }
+}
+
+export const TOKEN_STORAGE_KEY = TOKEN_KEY;
 
 export const api = createClient();
 
