@@ -67,3 +67,7 @@ def seed_demo_data(db: Session) -> None:
     from starfall.seed_collection import seed_collection_data
 
     seed_collection_data(db)
+
+    from starfall.seed_starship239 import seed_starship239_data
+
+    seed_starship239_data(db)

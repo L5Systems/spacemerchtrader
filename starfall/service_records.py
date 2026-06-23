@@ -60,6 +60,8 @@ def _package_out(package: ContainerPackage) -> dict:
         "recipient_id": package.recipient_id,
         "address": package.address,
         "notes": package.notes,
+        "manifest_leg": package.manifest_leg,
+        "manifest_validated": package.manifest_validated,
         "created_at": package.created_at,
         "updated_at": package.updated_at,
     }
@@ -140,6 +142,9 @@ def get_package(db: Session, client_id: str, package_id: str) -> ContainerPackag
 
 
 def create_package(db: Session, container: Container, data: dict) -> dict:
+    leg = data.get("manifest_leg") or None
+    if leg == "":
+        leg = None
     package = ContainerPackage(
         id=str(uuid.uuid4()),
         container_id=container.id,
@@ -149,6 +154,7 @@ def create_package(db: Session, container: Container, data: dict) -> dict:
         recipient_id=data["recipient_id"],
         address=data["address"],
         notes=data.get("notes", ""),
+        manifest_leg=leg,
     )
     db.add(package)
     _touch(container)
@@ -158,9 +164,20 @@ def create_package(db: Session, container: Container, data: dict) -> dict:
 
 
 def update_package(db: Session, package: ContainerPackage, container: Container, data: dict) -> dict:
-    for field in ("package_id", "owner_name", "recipient_name", "recipient_id", "address", "notes"):
+    for field in (
+        "package_id",
+        "owner_name",
+        "recipient_name",
+        "recipient_id",
+        "address",
+        "notes",
+        "manifest_leg",
+    ):
         if field in data:
-            setattr(package, field, data[field])
+            value = data[field]
+            if field == "manifest_leg" and value == "":
+                value = None
+            setattr(package, field, value)
     _touch(package)
     _touch(container)
     db.commit()

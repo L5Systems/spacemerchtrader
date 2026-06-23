@@ -1,9 +1,12 @@
 <script>
-  import { createClient, getStoredToken, notifyGameReward, SYSTEMS } from './lib/api.js';
+  import { createClient, getStoredToken, notifyGameFeedback, notifyGameReward, SYSTEMS } from './lib/api.js';
   import Panel from './lib/Panel.svelte';
   import ResultView from './lib/ResultView.svelte';
   import Marketplace from './lib/Marketplace.svelte';
   import GameHUD from './lib/GameHUD.svelte';
+  import GameFeedback from './lib/GameFeedback.svelte';
+  import LaunchBroker from './lib/LaunchBroker.svelte';
+  import MissionGuide from './lib/MissionGuide.svelte';
 
   let apiBase = $state('/api');
   let authToken = $state(getStoredToken());
@@ -143,6 +146,12 @@
       orderData = result.order ?? result;
       if (result.game_result) {
         notifyGameReward(result.game_result);
+      } else if (!authToken) {
+        notifyGameFeedback({
+          title: 'Order placed',
+          message: 'Sign in via Marketplace to earn credits, XP, and mission progress on trades.',
+          variant: 'info',
+        });
       }
       lookupOrderId = orderData.id;
       try {
@@ -236,6 +245,7 @@
 </script>
 
 <div class="app">
+  <GameFeedback />
   <header class="hero">
     <div class="hero-text">
       <p class="eyebrow">Starfall Online</p>
@@ -260,6 +270,9 @@
   </header>
 
   <GameHUD {apiBase} />
+
+  <LaunchBroker {apiBase} />
+  <MissionGuide {apiBase} />
 
   <Marketplace apiBase={apiBase} />
 

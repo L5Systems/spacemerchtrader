@@ -78,6 +78,25 @@ class CollectionOutcome(str, enum.Enum):
     INCIDENT = "incident"
 
 
+class LaunchSlotStatus(str, enum.Enum):
+    AVAILABLE = "available"
+    BOOKED = "booked"
+    FULL = "full"
+
+
+class ManifestStatus(str, enum.Enum):
+    DRAFT = "draft"
+    BOOKED = "booked"
+    ADVERTISING = "advertising"
+    READY = "ready"
+    COMPLETED = "completed"
+
+
+class ManifestLeg(str, enum.Enum):
+    OUTBOUND = "outbound"
+    RETURN = "return"
+
+
 SERVICE_CATEGORY_LABELS: dict[ServiceCategory, str] = {
     ServiceCategory.CONTAINER_ASSEMBLY: "Container Assembly",
     ServiceCategory.CONTAINER_AGGREGATOR: "Container Aggregator (Launch)",
@@ -330,6 +349,8 @@ class ContainerPackage(Base):
     recipient_id: Mapped[str] = mapped_column(String(64))
     address: Mapped[str] = mapped_column(String(256))
     notes: Mapped[str] = mapped_column(Text, default="")
+    manifest_leg: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    manifest_validated: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
@@ -365,6 +386,10 @@ class LaunchBooking(Base):
     launch_window: Mapped[str] = mapped_column(String(128))
     payload_ref: Mapped[str] = mapped_column(String(128), default="")
     mass_kg: Mapped[float] = mapped_column(Float, default=0.0)
+    target_orbit: Mapped[str] = mapped_column(String(128), default="")
+    berth_destination: Mapped[str] = mapped_column(String(256), default="")
+    ship_ref: Mapped[str] = mapped_column(String(64), default="")
+    slot_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
     status: Mapped[RecordStatus] = mapped_column(Enum(RecordStatus), default=RecordStatus.DRAFT)
     notes: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -463,6 +488,72 @@ class CollectionJob(Base):
     contractor: Mapped["ServiceProvider"] = relationship()
 
 
+class LaunchSlot(Base):
+    __tablename__ = "launch_slots"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    slot_code: Mapped[str] = mapped_column(String(64))
+    ship_ref: Mapped[str] = mapped_column(String(64))
+    target_orbit: Mapped[str] = mapped_column(String(64))
+    berth_destination: Mapped[str] = mapped_column(String(256))
+    launch_window: Mapped[str] = mapped_column(String(128))
+    pad_location: Mapped[str] = mapped_column(String(128))
+    package_capacity: Mapped[int] = mapped_column(Integer, default=8)
+    packages_reserved: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[LaunchSlotStatus] = mapped_column(
+        Enum(LaunchSlotStatus), default=LaunchSlotStatus.AVAILABLE
+    )
+    booked_by_client_id: Mapped[str | None] = mapped_column(ForeignKey("clients.id"), nullable=True)
+
+
+class PlayerManifest(Base):
+    __tablename__ = "player_manifests"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"))
+    slot_id: Mapped[str] = mapped_column(ForeignKey("launch_slots.id"))
+    container_id: Mapped[str | None] = mapped_column(ForeignKey("containers.id"), nullable=True)
+    container_code: Mapped[str] = mapped_column(String(64))
+    booking_id: Mapped[str | None] = mapped_column(ForeignKey("launch_bookings.id"), nullable=True)
+    status: Mapped[ManifestStatus] = mapped_column(Enum(ManifestStatus), default=ManifestStatus.DRAFT)
+    outbound_slots: Mapped[int] = mapped_column(Integer, default=4)
+    return_slots: Mapped[int] = mapped_column(Integer, default=4)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+    slot: Mapped["LaunchSlot"] = relationship()
+    container: Mapped["Container"] = relationship()
+
+
+class StarshipContainerRegistry(Base):
+    """Index of active container bookings per starship for the Launch Broker manifest registry."""
+
+    __tablename__ = "starship_container_registry"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    ship_ref: Mapped[str] = mapped_column(String(64), index=True)
+    manifest_id: Mapped[str] = mapped_column(ForeignKey("player_manifests.id"), unique=True)
+    booking_id: Mapped[str] = mapped_column(ForeignKey("launch_bookings.id"))
+    slot_id: Mapped[str] = mapped_column(ForeignKey("launch_slots.id"))
+    container_id: Mapped[str] = mapped_column(ForeignKey("containers.id"))
+    container_code: Mapped[str] = mapped_column(String(64))
+    container_owner_name: Mapped[str] = mapped_column(String(128))
+    trader_client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"))
+    trader_display_name: Mapped[str] = mapped_column(String(128))
+    slot_code: Mapped[str] = mapped_column(String(64))
+    launch_window: Mapped[str] = mapped_column(String(128))
+    berth_destination: Mapped[str] = mapped_column(String(256))
+    manifest_status: Mapped[str] = mapped_column(String(32))
+    package_count: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
 class MissionType(str, enum.Enum):
     TRADE_ROUTE = "trade_route"
     ORDER_COUNT = "order_count"
@@ -498,6 +589,9 @@ class Mission(Base):
     contractor_disposition: Mapped[ContractorDisposition | None] = mapped_column(
         Enum(ContractorDisposition), nullable=True
     )
+    ship_ref: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    min_outbound_packages: Mapped[int] = mapped_column(Integer, default=0)
+    min_return_packages: Mapped[int] = mapped_column(Integer, default=0)
     target_quantity: Mapped[int] = mapped_column(Integer, default=1)
     reward_credits: Mapped[float] = mapped_column(Float)
     reward_xp: Mapped[int] = mapped_column(Integer)
@@ -516,6 +610,46 @@ class MissionProgress(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     mission: Mapped["Mission"] = relationship()
+
+
+class GuidedMissionStatus(str, enum.Enum):
+    ACTIVE = "active"
+    COMPLETED = "completed"
+    ABANDONED = "abandoned"
+
+
+class GuidedMission(Base):
+    """Player-specific generated delivery contract with guided steps and scoring."""
+
+    __tablename__ = "guided_missions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"))
+    contract_code: Mapped[str] = mapped_column(String(32))
+    company_name: Mapped[str] = mapped_column(String(128))
+    title: Mapped[str] = mapped_column(String(256))
+    cargo_description: Mapped[str] = mapped_column(Text)
+    dimensions_cm: Mapped[str] = mapped_column(String(32))
+    weight_kg: Mapped[float] = mapped_column(Float)
+    destination: Mapped[str] = mapped_column(String(256))
+    destination_system: Mapped[str] = mapped_column(String(64), default="mars")
+    required_delivery_date: Mapped[str] = mapped_column(String(32))
+    reward_credits: Mapped[float] = mapped_column(Float, default=1500.0)
+    reward_xp: Mapped[int] = mapped_column(Integer, default=200)
+    steps_json: Mapped[str] = mapped_column(Text, default="[]")
+    current_step_index: Mapped[int] = mapped_column(Integer, default=0)
+    score: Mapped[int] = mapped_column(Integer, default=0)
+    max_score: Mapped[int] = mapped_column(Integer, default=100)
+    penalties: Mapped[int] = mapped_column(Integer, default=0)
+    step_results_json: Mapped[str] = mapped_column(Text, default="{}")
+    status: Mapped[GuidedMissionStatus] = mapped_column(
+        Enum(GuidedMissionStatus), default=GuidedMissionStatus.ACTIVE
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class GameState(Base):

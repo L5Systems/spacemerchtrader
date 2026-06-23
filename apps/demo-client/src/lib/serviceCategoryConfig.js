@@ -1,6 +1,64 @@
 export const RECORD_STATUSES = ['draft', 'active', 'completed', 'cancelled'];
 
 export const SERVICE_WORKSPACES = {
+  container_assembly: {
+    label: 'Container Assembly',
+    recordLabel: 'Container',
+    summaryField: 'container_code',
+    fields: [
+      { key: 'container_code', label: 'Container code', required: true, placeholder: 'CNT-SOL-001' },
+      { key: 'owner_name', label: 'Owner name', required: true, placeholder: 'Aurora Trading Co.' },
+      { key: 'system_id', label: 'System', type: 'system', required: true },
+      { key: 'status', label: 'Status', type: 'status' },
+      { key: 'notes', label: 'Notes', type: 'textarea' },
+    ],
+    packages: {
+      label: 'Package',
+      fields: [
+        { key: 'package_id', label: 'Package ID', required: true, placeholder: 'PKG-8842' },
+        { key: 'owner_name', label: 'Owner name', required: true },
+        { key: 'recipient_name', label: 'Recipient name', required: true },
+        { key: 'recipient_id', label: 'Recipient ID', required: true, placeholder: 'RCPT-230' },
+        { key: 'address', label: 'Address', required: true, placeholder: 'Starship239 Factory Ring, LEO' },
+        {
+          key: 'manifest_leg',
+          label: 'Manifest leg',
+          type: 'leg',
+          placeholder: 'outbound or return',
+        },
+        { key: 'notes', label: 'Notes', type: 'textarea' },
+      ],
+    },
+  },
+  container_collection: {
+    label: 'Container Collection',
+    recordLabel: 'Collection job',
+    summaryField: 'job_code',
+    pickupAction: true,
+    fields: [
+      { key: 'job_code', label: 'Job code', required: true, placeholder: 'COL-SOL-001' },
+      { key: 'container_code', label: 'Container code', required: true, placeholder: 'CNT-SOL-001' },
+      { key: 'contractor_id', label: 'Offshore contractor', type: 'contractor', required: true },
+      { key: 'system_id', label: 'System', type: 'system', required: true },
+      {
+        key: 'pickup_site',
+        label: 'Pickup site',
+        required: true,
+        placeholder: 'Offshore Platform 7, Sol Drift',
+      },
+      { key: 'owner_name', label: 'Owner name', required: true },
+      { key: 'package_id', label: 'Package ID', placeholder: 'PKG-8842' },
+      { key: 'recipient_name', label: 'Recipient name' },
+      { key: 'recipient_id', label: 'Recipient ID' },
+      {
+        key: 'delivery_address',
+        label: 'Delivery address',
+        placeholder: 'Lab 230, Starship 4090',
+      },
+      { key: 'status', label: 'Status', type: 'status' },
+      { key: 'notes', label: 'Notes', type: 'textarea' },
+    ],
+  },
   container_aggregator: {
     label: 'Container Aggregator',
     recordLabel: 'Launch stack',

@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 
 from agents.base import BaseAgent
 from agents.inventory_agent import InventoryAgent
+from agents.launch_broker_agent import LaunchBrokerAgent
+from agents.mission_guide_agent import MissionGuideAgent
 from agents.pricing_agent import PricingAgent
 from agents.routing_agent import RoutingAgent
 from starfall.models import AgentRun, OrderStatus
@@ -14,6 +16,8 @@ AGENTS: dict[str, BaseAgent] = {
     "pricing": PricingAgent(),
     "inventory": InventoryAgent(),
     "routing": RoutingAgent(),
+    "launch_broker": LaunchBrokerAgent(),
+    "mission_guide": MissionGuideAgent(),
 }
 
 

@@ -167,6 +167,10 @@ def _complete_mission(db: Session, profile: PlayerProfile, progress: MissionProg
 
 
 def _count_service_progress(db: Session, client_id: str, mission: Mission) -> int:
+    if mission.ship_ref:
+        from starfall.manifest import count_manifest_mission_progress
+
+        return count_manifest_mission_progress(db, client_id, mission)
     if mission.service_category == ServiceCategory.CONTAINER_ASSEMBLY:
         return db.query(Container).filter(Container.client_id == client_id).count()
     if mission.service_category == ServiceCategory.CONTAINER_COLLECTION:
@@ -301,6 +305,20 @@ def on_service_record_created(db: Session, client_id: str, category: ServiceCate
         return None
     db.refresh(profile)
     return {"mission_rewards": mission_rewards, "total_credits": round(profile.credits, 2)}
+
+
+def on_manifest_updated(db: Session, client_id: str) -> dict | None:
+    profile = get_or_create_profile(db, client_id)
+    mission_rewards = _check_missions(db, client_id, profile)
+    db.commit()
+    db.refresh(profile)
+    if not mission_rewards:
+        return None
+    return {
+        "mission_rewards": mission_rewards,
+        "total_credits": round(profile.credits, 2),
+    }
+
 
 
 def advance_market_tick(db: Session) -> dict:

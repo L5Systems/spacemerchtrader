@@ -110,6 +110,31 @@ class AgentRunRequest(BaseModel):
     payload: dict[str, Any] = Field(default_factory=dict)
 
 
+class LaunchBrokerChatRequest(BaseModel):
+    instruction: str = Field(..., examples=["find a LEO slot for September 2032 on Starship239"])
+    action: str | None = None
+    slot_id: str | None = None
+    container_code: str | None = None
+    package_id: str | None = None
+    leg: str | None = None
+    ship_ref: str | None = None
+    owner_name: str | None = None
+    recipient_name: str | None = None
+    recipient_id: str | None = None
+    address: str | None = None
+    notes: str | None = None
+
+
+class MissionGuideChatRequest(BaseModel):
+    instruction: str = Field(
+        ...,
+        examples=["generate mission: 100kg mining welding gear to ElonsTown on Mars"],
+    )
+    action: str | None = None
+    brief: str | None = None
+    replace: bool | None = None
+
+
 class AgentRunOut(BaseModel):
     id: str
     agent_id: str
@@ -209,6 +234,7 @@ class ContainerPackageCreate(BaseModel):
     recipient_id: str = Field(..., examples=["RCPT-230"])
     address: str = Field(..., examples=["Lab 230, Starship 4090"])
     notes: str = ""
+    manifest_leg: str = Field(default="", examples=["outbound"])
 
 
 class ContainerPackageUpdate(BaseModel):
@@ -218,6 +244,7 @@ class ContainerPackageUpdate(BaseModel):
     recipient_id: str | None = None
     address: str | None = None
     notes: str | None = None
+    manifest_leg: str | None = None
 
 
 class LaunchStackCreate(BaseModel):

@@ -1,50 +1,125 @@
 <script>
-  import { createClient, getStoredToken } from './api.js';
+  import { createClient, formatGameResultFeedback, getStoredToken } from './api.js';
+
+  /** @typedef {import('./gameTypes.js').GameWorld} GameWorld */
+  /** @typedef {import('./gameTypes.js').LeaderboardRow} LeaderboardRow */
+  /** @typedef {import('./gameTypes.js').GameMission} GameMission */
+  /** @typedef {import('./gameTypes.js').PlayerStats} PlayerStats */
+  /** @typedef {import('./gameTypes.js').PlayerStatus} PlayerStatus */
+  /** @typedef {import('./gameTypes.js').GameResultFeedback} GameResultFeedback */
+
+  const XP_PER_LEVEL = 500;
 
   let { apiBase } = $props();
 
   let token = $state(getStoredToken());
   let client = $derived(createClient(apiBase, token || undefined));
+  /** @type {GameWorld | null} */
   let world = $state(null);
+  /** @type {PlayerStatus | null} */
   let player = $state(null);
+  /** @type {LeaderboardRow[]} */
   let leaderboard = $state([]);
+  /** @type {Record<string, any> | null} */
   let lastReward = $state(null);
+  /** @type {GameResultFeedback | null} */
+  let lastRewardText = $derived(formatGameResultFeedback(lastReward));
+  /** @type {string | null} */
   let error = $state(null);
+  /** @type {string | null} */
+  let playerError = $state(null);
   let loading = $state(false);
+
+  /** @param {number} xpToNext */
+  function xpProgressPercent(xpToNext) {
+    const progress = XP_PER_LEVEL - xpToNext;
+    return Math.min(100, Math.max(0, (progress / XP_PER_LEVEL) * 100));
+  }
+
+  async function refreshPlayer() {
+    if (!token) {
+      player = null;
+      playerError = null;
+      return;
+    }
+
+    try {
+      player = await client.gameMe();
+      playerError = null;
+    } catch (e) {
+      player = null;
+      const message = e instanceof Error ? e.message : String(e);
+      playerError = message.includes('401') ? 'Session expired. Sign in again via Marketplace.' : message;
+    }
+  }
 
   async function refresh() {
     loading = true;
     error = null;
-    try {
-      world = await client.gameWorld();
-      leaderboard = await client.gameLeaderboard();
-      if (token) {
-        player = await client.gameMe();
-      } else {
-        player = null;
-      }
-    } catch (e) {
-      error = e.message;
-    } finally {
-      loading = false;
+
+    const [worldResult, leaderboardResult] = await Promise.allSettled([
+      client.gameWorld(),
+      client.gameLeaderboard(),
+    ]);
+
+    if (worldResult.status === 'fulfilled') {
+      world = /** @type {GameWorld} */ (worldResult.value);
+    } else {
+      world = null;
+      const reason = worldResult.reason;
+      error =
+        reason instanceof Error ? reason.message : String(reason ?? 'Failed to load world status');
     }
+
+    if (leaderboardResult.status === 'fulfilled') {
+      leaderboard = /** @type {LeaderboardRow[]} */ (leaderboardResult.value);
+    } else if (!error) {
+      const reason = leaderboardResult.reason;
+      error =
+        reason instanceof Error
+          ? reason.message
+          : String(reason ?? 'Failed to load leaderboard');
+    }
+
+    await refreshPlayer();
+    loading = false;
+  }
+
+  /** @param {Event} event */
+  function onGameReward(event) {
+    lastReward = /** @type {Record<string, any>} */ (
+      /** @type {CustomEvent<Record<string, any>>} */ (event).detail
+    );
+    void refresh();
+  }
+
+  function onAuthChanged() {
+    token = getStoredToken();
+    void refresh();
   }
 
   $effect(() => {
     token = getStoredToken();
-    refresh();
-    const interval = setInterval(refresh, 30000);
+    void apiBase;
+    void client;
+    void refresh();
+  });
+
+  $effect(() => {
+    const interval = setInterval(() => {
+      void refresh();
+    }, 30000);
     return () => clearInterval(interval);
   });
 
-  window.addEventListener('starfall-auth-changed', () => {
-    token = getStoredToken();
-    refresh();
-  });
+  $effect(() => {
+    window.addEventListener('starfall-auth-changed', onAuthChanged);
+    window.addEventListener('starfall-game-reward', onGameReward);
 
-  window.addEventListener('starfall-game-reward', (event) => {
-    lastReward = event.detail;
-    refresh();
+    return () => {
+      window.removeEventListener('starfall-auth-changed', onAuthChanged);
+      window.removeEventListener('starfall-game-reward', onGameReward);
+    };
   });
 </script>
 
@@ -55,12 +130,17 @@
       <h2>Starfall Trader League</h2>
       <p class="tagline">Trade, assemble cargo, complete missions, and climb the galactic leaderboard.</p>
     </div>
-    {#if world}
-      <div class="world-strip">
-        <span class="badge info">Cycle {world.market_cycle}</span>
-        <span class="muted">{world.online_players} traders online</span>
-      </div>
-    {/if}
+    <div class="header-actions">
+      {#if world}
+        <div class="world-strip">
+          <span class="badge info">Cycle {world.market_cycle}</span>
+          <span class="muted">{world.online_players} traders online</span>
+        </div>
+      {/if}
+      <button type="button" onclick={() => void refresh()} disabled={loading}>
+        {loading ? 'Refreshing…' : 'Refresh'}
+      </button>
+    </div>
   </header>
 
   {#if world?.event_message}
@@ -71,11 +151,12 @@
     <div class="error-box">{error}</div>
   {/if}
 
-  {#if lastReward}
-    <div class="reward-banner">
-      Earned {lastReward.credits_earned ?? 0} cr · +{lastReward.xp_gained ?? 0} XP
-      {#if lastReward.mission_rewards?.length}
-        · Mission complete: {lastReward.mission_rewards.map((m) => m.title).join(', ')}
+  {#if lastRewardText}
+    <div class="reward-banner {lastRewardText.variant}">
+      <strong>{lastRewardText.title}</strong>
+      <p>{lastRewardText.message}</p>
+      {#if lastRewardText.detail}
+        <p class="meta">{lastRewardText.detail}</p>
       {/if}
     </div>
   {/if}
@@ -97,12 +178,14 @@
         <div class="xp-bar">
           <div
             class="xp-fill"
-            style={`width: ${100 - (player.player.xp_to_next_level / 500) * 100}%`}
+            style={`width: ${xpProgressPercent(player.player.xp_to_next_level)}%`}
           ></div>
         </div>
         <p class="meta">{player.player.xp_to_next_level} XP to next level</p>
       {:else if loading}
         <p class="muted">Loading profile…</p>
+      {:else if playerError}
+        <p class="muted">{playerError}</p>
       {/if}
     </div>
 
@@ -112,7 +195,7 @@
         <p class="muted">Missions unlock after sign-in.</p>
       {:else if player?.missions?.length}
         <ul class="mission-list">
-          {#each player.missions as mission}
+          {#each player.missions as mission (mission.id)}
             <li class:done={mission.completed}>
               <div class="mission-top">
                 <strong>{mission.title}</strong>
@@ -127,12 +210,18 @@
             </li>
           {/each}
         </ul>
+      {:else if loading}
+        <p class="muted">Loading missions…</p>
+      {:else}
+        <p class="muted">No missions available yet.</p>
       {/if}
     </div>
 
     <div class="hud-panel">
       <h3>Leaderboard</h3>
-      {#if leaderboard.length === 0}
+      {#if loading && leaderboard.length === 0}
+        <p class="muted">Loading rankings…</p>
+      {:else if leaderboard.length === 0}
         <p class="muted">No rankings yet.</p>
       {:else}
         <table>
@@ -146,7 +235,7 @@
             </tr>
           </thead>
           <tbody>
-            {#each leaderboard as row}
+            {#each leaderboard as row (row.rank)}
               <tr>
                 <td>{row.rank}</td>
                 <td>{row.display_name}</td>
@@ -182,6 +271,13 @@
     align-items: flex-start;
   }
 
+  .header-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.65rem;
+  }
+
   .eyebrow {
     margin: 0;
     color: var(--gold);
@@ -207,6 +303,7 @@
     gap: 0.65rem;
     align-items: center;
     flex-wrap: wrap;
+    justify-content: flex-end;
   }
 
   .event-banner {
@@ -225,6 +322,16 @@
     border: 1px solid rgba(94, 230, 154, 0.25);
     color: var(--success);
     font-size: 0.9rem;
+  }
+
+  .reward-banner p {
+    margin: 0.2rem 0 0;
+  }
+
+  .reward-banner.warning {
+    background: rgba(240, 192, 96, 0.08);
+    border-color: rgba(240, 192, 96, 0.25);
+    color: var(--gold);
   }
 
   .hud-grid {
@@ -277,6 +384,7 @@
   .xp-fill {
     height: 100%;
     background: linear-gradient(90deg, var(--accent-dim), var(--accent));
+    transition: width 0.25s ease;
   }
 
   .meta {

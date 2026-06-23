@@ -3,8 +3,11 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
+# Never commit machine-local venv config (e.g. .venv/pip.ini). See pip.ini.example.
 .env
+.env.example
 *.db
+*.db.*
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/

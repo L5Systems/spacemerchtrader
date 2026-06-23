@@ -27,6 +27,9 @@ export function createClient(baseUrl = DEFAULT_BASE, token) {
     }
     if (!res.ok) {
       const detail = typeof body === 'object' && body?.detail ? body.detail : res.statusText;
+      if (res.status === 401 && token) {
+        storeToken('');
+      }
       throw new Error(`${res.status}: ${detail}`);
     }
     if (res.status === 204) return null;
@@ -96,6 +99,23 @@ export function createClient(baseUrl = DEFAULT_BASE, token) {
       }),
     deleteContainerPackage: (packageId) =>
       request(`/marketplace/services/container_assembly/packages/${packageId}`, { method: 'DELETE' }),
+    listCollectionContractors: () =>
+      request('/marketplace/services/container_collection/contractors'),
+    executeCollectionPickup: (recordId) =>
+      request(`/marketplace/services/container_collection/records/${recordId}/pickup`, {
+        method: 'POST',
+      }),
+    launchBrokerChat: (body) =>
+      request('/agents/launch_broker/chat', { method: 'POST', body: JSON.stringify(body) }),
+    launchBrokerRegistry: (params = {}) => {
+      const query = new URLSearchParams();
+      if (params.ship_ref) query.set('ship_ref', params.ship_ref);
+      if (params.container_code) query.set('container_code', params.container_code);
+      const suffix = query.toString() ? `?${query.toString()}` : '';
+      return request(`/agents/launch_broker/registry${suffix}`);
+    },
+    missionGuideChat: (body) =>
+      request('/agents/mission_guide/chat', { method: 'POST', body: JSON.stringify(body) }),
     gameWorld: () => request('/game/world'),
     gameMe: () => request('/game/me'),
     gameLeaderboard: () => request('/game/leaderboard'),
@@ -115,8 +135,58 @@ export function storeToken(token) {
   window.dispatchEvent(new CustomEvent('starfall-auth-changed'));
 }
 
+/** @param {import('./gameTypes.js').GameRewardResult|null|undefined} reward @returns {import('./gameTypes.js').GameResultFeedback|null} */
+export function formatGameResultFeedback(reward) {
+  if (!reward) return null;
+
+  if (reward.outcome_detail) {
+    const variant =
+      reward.outcome === 'incident' || reward.outcome === 'skimmed' ? 'warning' : 'success';
+    const stats = [];
+    if (reward.xp_gained) stats.push(`+${reward.xp_gained} XP`);
+    if (reward.pickup_fee) stats.push(`−${reward.pickup_fee} cr fee`);
+    if (reward.total_credits != null) stats.push(`${reward.total_credits} cr balance`);
+
+    const titles = /** @type {Record<string, string>} */ ({
+      picked_up: 'Container collected',
+      skimmed: 'Pickup complete — skimmed',
+      incident: 'Pickup incident',
+    });
+
+    return {
+      title: titles[reward.outcome ?? ''] ?? 'Container pickup',
+      message: reward.outcome_detail,
+      detail: stats.length ? stats.join(' · ') : undefined,
+      variant,
+    };
+  }
+
+  const stats = [];
+  if (reward.credits_earned) stats.push(`+${reward.credits_earned} cr earned`);
+  if (reward.xp_gained) stats.push(`+${reward.xp_gained} XP`);
+  if (reward.reputation_gained) stats.push(`+${reward.reputation_gained} rep`);
+  if (reward.total_credits != null) stats.push(`${reward.total_credits} cr balance`);
+
+  let title = 'Trade recorded';
+  if (reward.mission_rewards?.length) {
+    title = `Mission complete: ${reward.mission_rewards.map((m) => m.title).join(', ')}`;
+  }
+
+  return {
+    title,
+    message: stats.join(' · ') || 'Your captain profile was updated.',
+    variant: 'success',
+  };
+}
+
+export function notifyGameFeedback(feedback) {
+  window.dispatchEvent(new CustomEvent('starfall-game-feedback', { detail: feedback }));
+}
+
 export function notifyGameReward(reward) {
   window.dispatchEvent(new CustomEvent('starfall-game-reward', { detail: reward }));
+  const formatted = formatGameResultFeedback(reward);
+  if (formatted) notifyGameFeedback(formatted);
 }
 
 export const TOKEN_STORAGE_KEY = TOKEN_KEY;

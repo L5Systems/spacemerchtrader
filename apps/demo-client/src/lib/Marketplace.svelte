@@ -1,5 +1,5 @@
 <script>
-  import { createClient, getStoredToken, storeToken } from './api.js';
+  import { createClient, getStoredToken, notifyGameFeedback, storeToken } from './api.js';
   import CategoryWorkspace from './CategoryWorkspace.svelte';
 
   let { apiBase } = $props();
@@ -64,6 +64,11 @@
       });
       await persistSession(result);
       mode = 'browse';
+      notifyGameFeedback({
+        title: 'Welcome aboard',
+        message: `Signed in as ${result.display_name ?? email}. Missions and service actions now earn rewards.`,
+        variant: 'success',
+      });
     } catch (e) {
       error = e.message;
     } finally {
@@ -78,6 +83,11 @@
       const result = await client.marketplaceLogin({ email, password });
       await persistSession(result);
       mode = 'browse';
+      notifyGameFeedback({
+        title: 'Welcome aboard',
+        message: `Signed in as ${result.display_name ?? email}. Missions and service actions now earn rewards.`,
+        variant: 'success',
+      });
     } catch (e) {
       error = e.message;
     } finally {
@@ -205,6 +215,13 @@
                 <strong>{item.provider_name}</strong>
                 {#if item.verified}
                   <span class="badge ok">Verified</span>
+                {/if}
+                {#if item.contractor_disposition === 'reliable'}
+                  <span class="badge ok">Reliable</span>
+                {:else if item.contractor_disposition === 'crooked'}
+                  <span class="badge warn">Crooked</span>
+                {:else if item.contractor_disposition === 'accident_prone'}
+                  <span class="badge err">Accident-prone</span>
                 {/if}
               </header>
               <p class="meta">{item.system_id} · ★ {item.rating} · {item.base_rate} cr/{item.unit}</p>

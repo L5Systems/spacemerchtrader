@@ -1,0 +1,9 @@
+# Copy into your local virtualenv (not version-controlled):
+#   .venv/pip.ini
+#
+# Use this on networks that intercept HTTPS with a corporate proxy/certificate.
+
+[global]
+trusted-host =
+    pypi.org
+    files.pythonhosted.org

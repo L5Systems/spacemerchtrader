@@ -11,6 +11,8 @@ pip install -r requirements.txt
 uvicorn starfall.main:app --reload
 ```
 
+On Windows with corporate SSL interception, copy [`pip.ini.example`](pip.ini.example) to `.venv/pip.ini` after creating the venv. That file stays local and is ignored by git.
+
 Open [http://localhost:8000/docs](http://localhost:8000/docs) for the interactive API.
 
 Optional infrastructure:

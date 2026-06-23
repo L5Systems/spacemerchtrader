@@ -1,5 +1,5 @@
 <script>
-  import { SYSTEMS } from './api.js';
+  import { SYSTEMS, notifyGameFeedback, notifyGameReward } from './api.js';
   import { emptyForm, getWorkspaceConfig, RECORD_STATUSES } from './serviceCategoryConfig.js';
 
   let { client, category, categoryLabel = '' } = $props();
@@ -10,9 +10,41 @@
   let selected = $state(null);
   let form = $state({});
   let packageForm = $state({});
+  let contractors = $state([]);
   let error = $state(null);
   let loading = $state(false);
   let editingPackage = $state(null);
+
+  const DISPOSITION_BADGES = {
+    reliable: { label: 'Reliable', className: 'ok' },
+    crooked: { label: 'Crooked', className: 'warn' },
+    accident_prone: { label: 'Accident-prone', className: 'err' },
+  };
+
+  const OUTCOME_BADGES = {
+    pending: { label: 'Awaiting pickup', className: 'info' },
+    picked_up: { label: 'Picked up', className: 'ok' },
+    skimmed: { label: 'Skimmed', className: 'warn' },
+    incident: { label: 'Incident', className: 'err' },
+  };
+
+  function contractorLabel(id) {
+    const match = contractors.find((c) => c.id === id);
+    if (!match) return id;
+    return `${match.name} (${match.disposition_label})`;
+  }
+
+  async function loadContractors() {
+    if (category !== 'container_collection') {
+      contractors = [];
+      return;
+    }
+    try {
+      contractors = await client.listCollectionContractors();
+    } catch {
+      contractors = [];
+    }
+  }
 
   function resetForm(record = null) {
     if (!workspace) return;
@@ -140,6 +172,37 @@
     }
   }
 
+  async function executePickup() {
+    if (!selected || category !== 'container_collection') return;
+    loading = true;
+    error = null;
+    try {
+      const result = await client.executeCollectionPickup(selected.id);
+      selected = result.job;
+      resetForm(selected);
+      await loadRecords();
+
+      if (result.game_result) {
+        notifyGameReward(result.game_result);
+      } else {
+        notifyGameFeedback({
+          title: 'Pickup attempt failed',
+          message: result.job.outcome_detail || 'The contractor reported an incident. Try again.',
+          variant: 'warning',
+        });
+      }
+    } catch (e) {
+      error = e.message;
+      notifyGameFeedback({
+        title: 'Pickup failed',
+        message: e.message,
+        variant: 'danger',
+      });
+    } finally {
+      loading = false;
+    }
+  }
+
   function startCreate() {
     selected = null;
     resetForm();
@@ -150,6 +213,7 @@
     if (category && client) {
       view = 'list';
       selected = null;
+      loadContractors();
       loadRecords();
     }
   });
@@ -186,10 +250,19 @@
             <button class="record-row" onclick={() => openRecord(record)}>
               <strong>{record[workspace.summaryField]}</strong>
               <span class="badge info">{record.status}</span>
+              {#if record.outcome}
+                <span class="badge {OUTCOME_BADGES[record.outcome]?.className ?? 'info'}">
+                  {OUTCOME_BADGES[record.outcome]?.label ?? record.outcome}
+                </span>
+              {/if}
               {#if record.package_count != null}
                 <span class="muted">{record.package_count} packages</span>
               {/if}
-              <span class="muted mono">{record.owner_name ?? record.system_id ?? ''}</span>
+              {#if record.contractor_name}
+                <span class="muted">{record.contractor_name}</span>
+              {:else}
+                <span class="muted mono">{record.owner_name ?? record.system_id ?? ''}</span>
+              {/if}
             </button>
           {/each}
         </div>
@@ -213,6 +286,26 @@
                   <option value={status}>{status}</option>
                 {/each}
               </select>
+            {:else if field.type === 'contractor'}
+              <select id={`field-${field.key}`} bind:value={form[field.key]}>
+                <option value="">Select contractor…</option>
+                {#each contractors as contractor}
+                  <option value={contractor.id}>
+                    {contractor.name} — {contractor.disposition_label}
+                  </option>
+                {/each}
+              </select>
+              {#if form.contractor_id}
+                {@const picked = contractors.find((c) => c.id === form.contractor_id)}
+                {#if picked}
+                  <p class="field-hint">
+                    <span class="badge {DISPOSITION_BADGES[picked.disposition]?.className ?? 'info'}">
+                      {picked.disposition_label}
+                    </span>
+                    {picked.description}
+                  </p>
+                {/if}
+              {/if}
             {:else}
               <input
                 id={`field-${field.key}`}
@@ -229,11 +322,26 @@
         <button class="primary" onclick={saveRecord} disabled={loading}>
           {view === 'create' ? 'Create' : 'Save changes'}
         </button>
+        {#if view === 'detail' && workspace.pickupAction && selected?.status !== 'completed'}
+          <button class="accent" onclick={executePickup} disabled={loading}>
+            Execute offshore pickup
+          </button>
+        {/if}
         {#if view === 'detail'}
           <button class="danger" onclick={deleteRecord} disabled={loading}>Delete</button>
         {/if}
         <button onclick={() => (view = 'list')}>Cancel</button>
       </div>
+
+      {#if view === 'detail' && selected?.outcome_detail}
+        <div class="outcome-box {selected.outcome ?? 'pending'}">
+          <strong>{OUTCOME_BADGES[selected.outcome]?.label ?? 'Outcome'}</strong>
+          <p>{selected.outcome_detail}</p>
+          {#if selected.pickup_attempts}
+            <p class="meta">Attempts: {selected.pickup_attempts}</p>
+          {/if}
+        </div>
+      {/if}
 
       {#if view === 'detail' && workspace.packages && selected}
         <div class="packages">
@@ -276,6 +384,12 @@
                   <label for={`pkg-${field.key}`}>{field.label}</label>
                   {#if field.type === 'textarea'}
                     <textarea id={`pkg-${field.key}`} bind:value={packageForm[field.key]} rows="2"></textarea>
+                  {:else if field.type === 'leg'}
+                    <select id={`pkg-${field.key}`} bind:value={packageForm[field.key]}>
+                      <option value="">Select leg…</option>
+                      <option value="outbound">Outbound to LEO factory</option>
+                      <option value="return">Return to ground</option>
+                    </select>
                   {:else}
                     <input
                       id={`pkg-${field.key}`}
@@ -356,6 +470,46 @@
     text-align: left;
     padding: 0.75rem 1rem;
     width: 100%;
+  }
+
+  .field-hint {
+    margin: 0.35rem 0 0;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-start;
+  }
+
+  button.accent {
+    border-color: var(--gold);
+    color: var(--gold);
+  }
+
+  .outcome-box {
+    padding: 0.85rem 1rem;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--bg-panel);
+  }
+
+  .outcome-box strong {
+    display: block;
+    margin-bottom: 0.25rem;
+  }
+
+  .outcome-box p {
+    margin: 0;
+    font-size: 0.88rem;
+  }
+
+  .outcome-box.picked_up {
+    border-color: rgba(94, 230, 154, 0.3);
+  }
+
+  .outcome-box.skimmed,
+  .outcome-box.incident {
+    border-color: rgba(240, 192, 96, 0.3);
   }
 
   .form-grid {
