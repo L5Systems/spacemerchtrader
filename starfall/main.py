@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from starfall.config import settings
 from starfall.database import SessionLocal, init_db
-from starfall.routers import agents, core, marketplace
+from starfall.routers import agents, core, game, marketplace, services
 from starfall.seed import seed_demo_data
 
 
@@ -40,6 +40,8 @@ app.add_middleware(
 app.include_router(core.router, tags=["core"])
 app.include_router(agents.router)
 app.include_router(marketplace.router)
+app.include_router(services.router)
+app.include_router(game.router)
 
 
 @app.get("/")
@@ -49,4 +51,5 @@ def root() -> dict:
         "docs": "/docs",
         "agents": "/agents",
         "marketplace": "/marketplace/categories",
+        "game": "/game/world",
     }

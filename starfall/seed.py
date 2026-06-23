@@ -59,3 +59,11 @@ def seed_demo_data(db: Session) -> None:
         db.commit()
 
     seed_marketplace_data(db)
+
+    from starfall.seed_game import seed_game_data
+
+    seed_game_data(db)
+
+    from starfall.seed_collection import seed_collection_data
+
+    seed_collection_data(db)

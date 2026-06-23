@@ -29,6 +29,7 @@ export function createClient(baseUrl = DEFAULT_BASE, token) {
       const detail = typeof body === 'object' && body?.detail ? body.detail : res.statusText;
       throw new Error(`${res.status}: ${detail}`);
     }
+    if (res.status === 204) return null;
     return body;
   }
 
@@ -39,7 +40,11 @@ export function createClient(baseUrl = DEFAULT_BASE, token) {
     routeQuote: (origin, dest, qty = 1) =>
       request(`/routes/quote?origin=${origin}&dest=${dest}&qty=${qty}`),
     warehouseStock: (warehouseId) => request(`/warehouses/${warehouseId}/stock`),
-    placeOrder: (order) =>
+    placeOrder: async (order) => {
+      const result = await request('/orders', { method: 'POST', body: JSON.stringify(order) });
+      return result.order ?? result;
+    },
+    placeOrderWithRewards: (order) =>
       request('/orders', { method: 'POST', body: JSON.stringify(order) }),
     getOrder: (orderId) => request(`/orders/${orderId}`),
     getShipment: (orderId) => request(`/orders/${orderId}/shipment`),
@@ -64,6 +69,36 @@ export function createClient(baseUrl = DEFAULT_BASE, token) {
       request('/marketplace/login', { method: 'POST', body: JSON.stringify(body) }),
     marketplaceMe: () => request('/marketplace/me'),
     marketplaceMenu: () => request('/marketplace/menu'),
+    listServiceRecords: (category) => request(`/marketplace/services/${category}/records`),
+    getServiceRecord: (category, recordId) =>
+      request(`/marketplace/services/${category}/records/${recordId}`),
+    createServiceRecord: (category, body) =>
+      request(`/marketplace/services/${category}/records`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    updateServiceRecord: (category, recordId, body) =>
+      request(`/marketplace/services/${category}/records/${recordId}`, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      }),
+    deleteServiceRecord: (category, recordId) =>
+      request(`/marketplace/services/${category}/records/${recordId}`, { method: 'DELETE' }),
+    addContainerPackage: (containerId, body) =>
+      request(`/marketplace/services/container_assembly/containers/${containerId}/packages`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    updateContainerPackage: (packageId, body) =>
+      request(`/marketplace/services/container_assembly/packages/${packageId}`, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      }),
+    deleteContainerPackage: (packageId) =>
+      request(`/marketplace/services/container_assembly/packages/${packageId}`, { method: 'DELETE' }),
+    gameWorld: () => request('/game/world'),
+    gameMe: () => request('/game/me'),
+    gameLeaderboard: () => request('/game/leaderboard'),
   };
 }
 
@@ -77,6 +112,11 @@ export function storeToken(token) {
   } else {
     localStorage.removeItem(TOKEN_KEY);
   }
+  window.dispatchEvent(new CustomEvent('starfall-auth-changed'));
+}
+
+export function notifyGameReward(reward) {
+  window.dispatchEvent(new CustomEvent('starfall-game-reward', { detail: reward }));
 }
 
 export const TOKEN_STORAGE_KEY = TOKEN_KEY;

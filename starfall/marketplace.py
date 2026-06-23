@@ -18,6 +18,7 @@ from starfall.models import (
 DEFAULT_ACCESS_BY_ROLE: dict[ClientRole, list[ServiceCategory]] = {
     ClientRole.TRADER: [
         ServiceCategory.CONTAINER_ASSEMBLY,
+        ServiceCategory.CONTAINER_COLLECTION,
         ServiceCategory.CONTAINER_PORTER,
         ServiceCategory.OFFWORLD_DELIVERY,
     ],
@@ -73,6 +74,10 @@ def register_client(
     _grant_access(db, client, DEFAULT_ACCESS_BY_ROLE[role])
     db.commit()
     db.refresh(client)
+
+    from starfall.game import get_or_create_profile
+
+    get_or_create_profile(db, client.id)
     return client
 
 
@@ -120,6 +125,7 @@ def _category_description(category: ServiceCategory) -> str:
     descriptions = {
         ServiceCategory.CONTAINER_ASSEMBLY: "Build and configure cargo containers for interstellar shipment.",
         ServiceCategory.CONTAINER_AGGREGATOR: "Aggregate containers into launch-ready stacks for orbital insertion.",
+        ServiceCategory.CONTAINER_COLLECTION: "Hire offshore contractors to collect containers from remote platforms.",
         ServiceCategory.GROUND_LAUNCH: "Surface-to-orbit launch services from planetary facilities.",
         ServiceCategory.CONTAINER_PORTER: "Move containers between docks, yards, and transfer stations.",
         ServiceCategory.OFFWORLD_ENDPOINT: "Receive and hand off containers at offworld gateway terminals.",
@@ -157,6 +163,9 @@ def list_providers(
                 "home_system_id": provider.home_system_id,
                 "verified": provider.verified,
                 "rating": provider.rating,
+                "contractor_disposition": (
+                    provider.contractor_disposition.value if provider.contractor_disposition else None
+                ),
                 "offerings": [],
             }
         providers[provider.id]["offerings"].append(

@@ -58,19 +58,40 @@ class ClientStatus(str, enum.Enum):
 class ServiceCategory(str, enum.Enum):
     CONTAINER_ASSEMBLY = "container_assembly"
     CONTAINER_AGGREGATOR = "container_aggregator"
+    CONTAINER_COLLECTION = "container_collection"
     GROUND_LAUNCH = "ground_launch"
     CONTAINER_PORTER = "container_porter"
     OFFWORLD_ENDPOINT = "offworld_endpoint"
     OFFWORLD_DELIVERY = "offworld_delivery"
 
 
+class ContractorDisposition(str, enum.Enum):
+    RELIABLE = "reliable"
+    CROOKED = "crooked"
+    ACCIDENT_PRONE = "accident_prone"
+
+
+class CollectionOutcome(str, enum.Enum):
+    PENDING = "pending"
+    PICKED_UP = "picked_up"
+    SKIMMED = "skimmed"
+    INCIDENT = "incident"
+
+
 SERVICE_CATEGORY_LABELS: dict[ServiceCategory, str] = {
     ServiceCategory.CONTAINER_ASSEMBLY: "Container Assembly",
     ServiceCategory.CONTAINER_AGGREGATOR: "Container Aggregator (Launch)",
+    ServiceCategory.CONTAINER_COLLECTION: "Container Collection",
     ServiceCategory.GROUND_LAUNCH: "Ground Launch Provider",
     ServiceCategory.CONTAINER_PORTER: "Container Porter",
     ServiceCategory.OFFWORLD_ENDPOINT: "Offworld Endpoint",
     ServiceCategory.OFFWORLD_DELIVERY: "Offworld Container Delivery",
+}
+
+CONTRACTOR_DISPOSITION_LABELS: dict[ContractorDisposition, str] = {
+    ContractorDisposition.RELIABLE: "Reliable",
+    ContractorDisposition.CROOKED: "Crooked",
+    ContractorDisposition.ACCIDENT_PRONE: "Accident-prone",
 }
 
 
@@ -221,6 +242,9 @@ class Client(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     access_grants: Mapped[list["ClientAccess"]] = relationship(back_populates="client")
+    player_profile: Mapped["PlayerProfile | None"] = relationship(
+        back_populates="client", uselist=False
+    )
 
 
 class ClientAccess(Base):
@@ -244,6 +268,9 @@ class ServiceProvider(Base):
     home_system_id: Mapped[str] = mapped_column(ForeignKey("star_systems.id"))
     verified: Mapped[bool] = mapped_column(default=True)
     rating: Mapped[float] = mapped_column(Float, default=4.0)
+    contractor_disposition: Mapped[ContractorDisposition | None] = mapped_column(
+        Enum(ContractorDisposition), nullable=True
+    )
 
     offerings: Mapped[list["ServiceOffering"]] = relationship(back_populates="provider")
     home_system: Mapped["StarSystem"] = relationship()
@@ -263,3 +290,238 @@ class ServiceOffering(Base):
 
     provider: Mapped["ServiceProvider"] = relationship(back_populates="offerings")
     system: Mapped["StarSystem"] = relationship()
+
+
+class RecordStatus(str, enum.Enum):
+    DRAFT = "draft"
+    ACTIVE = "active"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+
+
+class Container(Base):
+    __tablename__ = "containers"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"))
+    container_code: Mapped[str] = mapped_column(String(64))
+    owner_name: Mapped[str] = mapped_column(String(128))
+    system_id: Mapped[str] = mapped_column(ForeignKey("star_systems.id"))
+    status: Mapped[RecordStatus] = mapped_column(Enum(RecordStatus), default=RecordStatus.DRAFT)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+    packages: Mapped[list["ContainerPackage"]] = relationship(
+        back_populates="container", cascade="all, delete-orphan"
+    )
+
+
+class ContainerPackage(Base):
+    __tablename__ = "container_packages"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    container_id: Mapped[str] = mapped_column(ForeignKey("containers.id"))
+    package_id: Mapped[str] = mapped_column(String(64))
+    owner_name: Mapped[str] = mapped_column(String(128))
+    recipient_name: Mapped[str] = mapped_column(String(128))
+    recipient_id: Mapped[str] = mapped_column(String(64))
+    address: Mapped[str] = mapped_column(String(256))
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+    container: Mapped["Container"] = relationship(back_populates="packages")
+
+
+class LaunchStack(Base):
+    __tablename__ = "launch_stacks"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"))
+    stack_code: Mapped[str] = mapped_column(String(64))
+    system_id: Mapped[str] = mapped_column(ForeignKey("star_systems.id"))
+    container_codes: Mapped[str] = mapped_column(String(512), default="")
+    target_orbit: Mapped[str] = mapped_column(String(128), default="LEO transfer")
+    status: Mapped[RecordStatus] = mapped_column(Enum(RecordStatus), default=RecordStatus.DRAFT)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
+class LaunchBooking(Base):
+    __tablename__ = "launch_bookings"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"))
+    booking_code: Mapped[str] = mapped_column(String(64))
+    pad_location: Mapped[str] = mapped_column(String(128))
+    launch_window: Mapped[str] = mapped_column(String(128))
+    payload_ref: Mapped[str] = mapped_column(String(128), default="")
+    mass_kg: Mapped[float] = mapped_column(Float, default=0.0)
+    status: Mapped[RecordStatus] = mapped_column(Enum(RecordStatus), default=RecordStatus.DRAFT)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
+class PorterJob(Base):
+    __tablename__ = "porter_jobs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"))
+    job_code: Mapped[str] = mapped_column(String(64))
+    container_code: Mapped[str] = mapped_column(String(64))
+    owner_name: Mapped[str] = mapped_column(String(128))
+    package_id: Mapped[str] = mapped_column(String(64), default="")
+    recipient_name: Mapped[str] = mapped_column(String(128), default="")
+    recipient_id: Mapped[str] = mapped_column(String(64), default="")
+    origin_address: Mapped[str] = mapped_column(String(256))
+    destination_address: Mapped[str] = mapped_column(String(256))
+    status: Mapped[RecordStatus] = mapped_column(Enum(RecordStatus), default=RecordStatus.DRAFT)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
+class EndpointReceipt(Base):
+    __tablename__ = "endpoint_receipts"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"))
+    receipt_code: Mapped[str] = mapped_column(String(64))
+    container_code: Mapped[str] = mapped_column(String(64))
+    package_id: Mapped[str] = mapped_column(String(64))
+    owner_name: Mapped[str] = mapped_column(String(128))
+    recipient_name: Mapped[str] = mapped_column(String(128))
+    recipient_id: Mapped[str] = mapped_column(String(64))
+    gateway_address: Mapped[str] = mapped_column(String(256))
+    status: Mapped[RecordStatus] = mapped_column(Enum(RecordStatus), default=RecordStatus.DRAFT)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
+class DeliveryOrder(Base):
+    __tablename__ = "delivery_orders"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"))
+    delivery_code: Mapped[str] = mapped_column(String(64))
+    package_id: Mapped[str] = mapped_column(String(64))
+    owner_name: Mapped[str] = mapped_column(String(128))
+    recipient_name: Mapped[str] = mapped_column(String(128))
+    recipient_id: Mapped[str] = mapped_column(String(64))
+    destination_address: Mapped[str] = mapped_column(String(256))
+    status: Mapped[RecordStatus] = mapped_column(Enum(RecordStatus), default=RecordStatus.DRAFT)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
+class CollectionJob(Base):
+    __tablename__ = "collection_jobs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"))
+    job_code: Mapped[str] = mapped_column(String(64))
+    container_code: Mapped[str] = mapped_column(String(64))
+    contractor_id: Mapped[str] = mapped_column(ForeignKey("service_providers.id"))
+    system_id: Mapped[str] = mapped_column(ForeignKey("star_systems.id"))
+    pickup_site: Mapped[str] = mapped_column(String(256))
+    owner_name: Mapped[str] = mapped_column(String(128))
+    package_id: Mapped[str] = mapped_column(String(64), default="")
+    recipient_name: Mapped[str] = mapped_column(String(128), default="")
+    recipient_id: Mapped[str] = mapped_column(String(64), default="")
+    delivery_address: Mapped[str] = mapped_column(String(256), default="")
+    outcome: Mapped[CollectionOutcome] = mapped_column(
+        Enum(CollectionOutcome), default=CollectionOutcome.PENDING
+    )
+    outcome_detail: Mapped[str] = mapped_column(Text, default="")
+    pickup_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[RecordStatus] = mapped_column(Enum(RecordStatus), default=RecordStatus.DRAFT)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+    contractor: Mapped["ServiceProvider"] = relationship()
+
+
+class MissionType(str, enum.Enum):
+    TRADE_ROUTE = "trade_route"
+    ORDER_COUNT = "order_count"
+    SERVICE_ACTION = "service_action"
+
+
+class PlayerProfile(Base):
+    __tablename__ = "player_profiles"
+
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"), primary_key=True)
+    credits: Mapped[float] = mapped_column(Float, default=10000.0)
+    xp: Mapped[int] = mapped_column(Integer, default=0)
+    level: Mapped[int] = mapped_column(Integer, default=1)
+    reputation: Mapped[float] = mapped_column(Float, default=0.0)
+    orders_completed: Mapped[int] = mapped_column(Integer, default=0)
+    missions_completed: Mapped[int] = mapped_column(Integer, default=0)
+    last_active: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    client: Mapped["Client"] = relationship(back_populates="player_profile")
+
+
+class Mission(Base):
+    __tablename__ = "missions"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    title: Mapped[str] = mapped_column(String(128))
+    description: Mapped[str] = mapped_column(Text)
+    mission_type: Mapped[MissionType] = mapped_column(Enum(MissionType))
+    product_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    origin_system_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    destination_system_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    service_category: Mapped[ServiceCategory | None] = mapped_column(Enum(ServiceCategory), nullable=True)
+    contractor_disposition: Mapped[ContractorDisposition | None] = mapped_column(
+        Enum(ContractorDisposition), nullable=True
+    )
+    target_quantity: Mapped[int] = mapped_column(Integer, default=1)
+    reward_credits: Mapped[float] = mapped_column(Float)
+    reward_xp: Mapped[int] = mapped_column(Integer)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class MissionProgress(Base):
+    __tablename__ = "mission_progress"
+    __table_args__ = (UniqueConstraint("client_id", "mission_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"))
+    mission_id: Mapped[str] = mapped_column(ForeignKey("missions.id"))
+    progress: Mapped[int] = mapped_column(Integer, default=0)
+    completed: Mapped[bool] = mapped_column(default=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    mission: Mapped["Mission"] = relationship()
+
+
+class GameState(Base):
+    __tablename__ = "game_state"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    market_cycle: Mapped[int] = mapped_column(Integer, default=1)
+    last_tick_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    event_message: Mapped[str] = mapped_column(String(256), default="Markets stable across all systems.")

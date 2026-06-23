@@ -1,11 +1,13 @@
 <script>
-  import { createClient, SYSTEMS } from './lib/api.js';
+  import { createClient, getStoredToken, notifyGameReward, SYSTEMS } from './lib/api.js';
   import Panel from './lib/Panel.svelte';
   import ResultView from './lib/ResultView.svelte';
   import Marketplace from './lib/Marketplace.svelte';
+  import GameHUD from './lib/GameHUD.svelte';
 
   let apiBase = $state('/api');
-  let client = $derived(createClient(apiBase));
+  let authToken = $state(getStoredToken());
+  let client = $derived(createClient(apiBase, authToken || undefined));
 
   let health = $state(null);
   let healthError = $state(null);
@@ -137,7 +139,11 @@
     shipmentData = null;
     shipmentError = null;
     try {
-      orderData = await run('POST /orders', () => client.placeOrder(orderForm));
+      const result = await run('POST /orders', () => client.placeOrderWithRewards(orderForm));
+      orderData = result.order ?? result;
+      if (result.game_result) {
+        notifyGameReward(result.game_result);
+      }
       lookupOrderId = orderData.id;
       try {
         shipmentData = await run('GET /orders/.../shipment', () =>
@@ -218,18 +224,23 @@
   }
 
   $effect(() => {
+    const onAuth = () => {
+      authToken = getStoredToken();
+    };
+    window.addEventListener('starfall-auth-changed', onAuth);
     checkHealth();
     fetchMarket();
     fetchAgents();
+    return () => window.removeEventListener('starfall-auth-changed', onAuth);
   });
 </script>
 
 <div class="app">
   <header class="hero">
     <div class="hero-text">
-      <p class="eyebrow">Starfall Space Merchandise Handling Co.</p>
-      <h1>Demo Client</h1>
-      <p class="tagline">Svelte 5 console for exercising the Starfall API and handling agents.</p>
+      <p class="eyebrow">Starfall Online</p>
+      <h1>Merch Trader</h1>
+      <p class="tagline">Multiplayer space trading game — haul cargo, run missions, and compete on the galactic leaderboard.</p>
     </div>
     <div class="hero-controls">
       <div class="field api-field">
@@ -247,6 +258,8 @@
       <div class="error-box">{healthError}</div>
     {/if}
   </header>
+
+  <GameHUD {apiBase} />
 
   <Marketplace apiBase={apiBase} />
 
@@ -511,6 +524,7 @@
     grid-template-columns: 1fr 260px;
     grid-template-areas:
       'hero hero'
+      'game game'
       'marketplace marketplace'
       'main activity';
   }
@@ -671,7 +685,7 @@
   @media (max-width: 1100px) {
     .app {
       grid-template-columns: 1fr;
-      grid-template-areas: 'hero' 'marketplace' 'main' 'activity';
+      grid-template-areas: 'hero' 'game' 'marketplace' 'main' 'activity';
     }
 
     .activity {

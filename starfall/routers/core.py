@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
 from starfall.database import get_db
@@ -9,6 +11,7 @@ from starfall.schemas import (
     MarketPriceOut,
     OrderCreate,
     OrderOut,
+    PlaceOrderOut,
     RouteQuoteOut,
     ShipmentOut,
     WarehouseStockOut,
@@ -61,15 +64,36 @@ def warehouse_stock(warehouse_id: str, db: Session = Depends(get_db)) -> Warehou
     return stock
 
 
-@router.post("/orders", response_model=OrderOut, status_code=201)
-def place_order(payload: OrderCreate, db: Session = Depends(get_db)) -> OrderOut:
+@router.post("/orders", response_model=PlaceOrderOut, status_code=201)
+def place_order(
+    payload: OrderCreate,
+    authorization: Annotated[str | None, Header()] = None,
+    db: Session = Depends(get_db),
+) -> PlaceOrderOut:
     from agents.orchestrator import process_new_order
+    from starfall.game import on_order_completed
+    from starfall.marketplace import get_client_by_token
 
-    order = create_order(db, payload.model_dump())
+    order_data = payload.model_dump()
+    player_client_id = None
+
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.removeprefix("Bearer ").strip()
+        client = get_client_by_token(db, token)
+        if client:
+            order_data["client_id"] = client.id
+            player_client_id = client.id
+
+    order = create_order(db, order_data)
     process_new_order(db, order.id)
     refreshed = get_order(db, order.id)
     assert refreshed is not None
-    return refreshed
+
+    game_result = None
+    if player_client_id:
+        game_result = on_order_completed(db, player_client_id, refreshed)
+
+    return PlaceOrderOut(order=refreshed, game_result=game_result)
 
 
 @router.get("/orders/{order_id}", response_model=OrderOut)

@@ -3,7 +3,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from starfall.models import AgentRunStatus, ClientRole, ClientStatus, OrderStatus, OrderType, ServiceCategory, ShipmentStatus
+from starfall.models import AgentRunStatus, ClientRole, ClientStatus, OrderStatus, OrderType, RecordStatus, ServiceCategory, ShipmentStatus
 
 
 class HealthResponse(BaseModel):
@@ -85,6 +85,11 @@ class OrderOut(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class PlaceOrderOut(BaseModel):
+    order: OrderOut
+    game_result: dict[str, Any] | None = None
 
 
 class ShipmentOut(BaseModel):
@@ -179,3 +184,176 @@ class MarketplaceMenuOut(BaseModel):
     categories: list[ServiceCategoryOut]
     providers_by_category: dict[str, list[dict[str, Any]]]
     providers: list[ServiceProviderOut]
+
+
+class ContainerCreate(BaseModel):
+    container_code: str = Field(..., examples=["CNT-SOL-001"])
+    owner_name: str = Field(..., examples=["Aurora Trading Co."])
+    system_id: str = Field(..., examples=["sol"])
+    status: RecordStatus = RecordStatus.DRAFT
+    notes: str = ""
+
+
+class ContainerUpdate(BaseModel):
+    container_code: str | None = None
+    owner_name: str | None = None
+    system_id: str | None = None
+    status: RecordStatus | None = None
+    notes: str | None = None
+
+
+class ContainerPackageCreate(BaseModel):
+    package_id: str = Field(..., examples=["PKG-8842"])
+    owner_name: str = Field(..., examples=["Aurora Trading Co."])
+    recipient_name: str = Field(..., examples=["Dr. Elena Voss"])
+    recipient_id: str = Field(..., examples=["RCPT-230"])
+    address: str = Field(..., examples=["Lab 230, Starship 4090"])
+    notes: str = ""
+
+
+class ContainerPackageUpdate(BaseModel):
+    package_id: str | None = None
+    owner_name: str | None = None
+    recipient_name: str | None = None
+    recipient_id: str | None = None
+    address: str | None = None
+    notes: str | None = None
+
+
+class LaunchStackCreate(BaseModel):
+    stack_code: str
+    system_id: str
+    container_codes: str = ""
+    target_orbit: str = "LEO transfer"
+    status: RecordStatus = RecordStatus.DRAFT
+    notes: str = ""
+
+
+class LaunchStackUpdate(BaseModel):
+    stack_code: str | None = None
+    system_id: str | None = None
+    container_codes: str | None = None
+    target_orbit: str | None = None
+    status: RecordStatus | None = None
+    notes: str | None = None
+
+
+class LaunchBookingCreate(BaseModel):
+    booking_code: str
+    pad_location: str
+    launch_window: str
+    payload_ref: str = ""
+    mass_kg: float = 0.0
+    status: RecordStatus = RecordStatus.DRAFT
+    notes: str = ""
+
+
+class LaunchBookingUpdate(BaseModel):
+    booking_code: str | None = None
+    pad_location: str | None = None
+    launch_window: str | None = None
+    payload_ref: str | None = None
+    mass_kg: float | None = None
+    status: RecordStatus | None = None
+    notes: str | None = None
+
+
+class PorterJobCreate(BaseModel):
+    job_code: str
+    container_code: str
+    owner_name: str
+    package_id: str = ""
+    recipient_name: str = ""
+    recipient_id: str = ""
+    origin_address: str
+    destination_address: str
+    status: RecordStatus = RecordStatus.DRAFT
+    notes: str = ""
+
+
+class PorterJobUpdate(BaseModel):
+    job_code: str | None = None
+    container_code: str | None = None
+    owner_name: str | None = None
+    package_id: str | None = None
+    recipient_name: str | None = None
+    recipient_id: str | None = None
+    origin_address: str | None = None
+    destination_address: str | None = None
+    status: RecordStatus | None = None
+    notes: str | None = None
+
+
+class EndpointReceiptCreate(BaseModel):
+    receipt_code: str
+    container_code: str
+    package_id: str
+    owner_name: str
+    recipient_name: str
+    recipient_id: str
+    gateway_address: str
+    status: RecordStatus = RecordStatus.DRAFT
+    notes: str = ""
+
+
+class EndpointReceiptUpdate(BaseModel):
+    receipt_code: str | None = None
+    container_code: str | None = None
+    package_id: str | None = None
+    owner_name: str | None = None
+    recipient_name: str | None = None
+    recipient_id: str | None = None
+    gateway_address: str | None = None
+    status: RecordStatus | None = None
+    notes: str | None = None
+
+
+class DeliveryOrderCreate(BaseModel):
+    delivery_code: str
+    package_id: str
+    owner_name: str
+    recipient_name: str
+    recipient_id: str
+    destination_address: str
+    status: RecordStatus = RecordStatus.DRAFT
+    notes: str = ""
+
+
+class DeliveryOrderUpdate(BaseModel):
+    delivery_code: str | None = None
+    package_id: str | None = None
+    owner_name: str | None = None
+    recipient_name: str | None = None
+    recipient_id: str | None = None
+    destination_address: str | None = None
+    status: RecordStatus | None = None
+    notes: str | None = None
+
+
+class CollectionJobCreate(BaseModel):
+    job_code: str
+    container_code: str
+    contractor_id: str
+    system_id: str
+    pickup_site: str = Field(..., examples=["Offshore Platform 7, Sol Drift"])
+    owner_name: str
+    package_id: str = ""
+    recipient_name: str = ""
+    recipient_id: str = ""
+    delivery_address: str = Field(default="", examples=["Lab 230, Starship 4090"])
+    notes: str = ""
+
+
+class CollectionJobUpdate(BaseModel):
+    job_code: str | None = None
+    container_code: str | None = None
+    contractor_id: str | None = None
+    system_id: str | None = None
+    pickup_site: str | None = None
+    owner_name: str | None = None
+    package_id: str | None = None
+    recipient_name: str | None = None
+    recipient_id: str | None = None
+    delivery_address: str | None = None
+    status: RecordStatus | None = None
+    notes: str | None = None

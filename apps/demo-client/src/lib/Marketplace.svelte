@@ -1,5 +1,6 @@
 <script>
   import { createClient, getStoredToken, storeToken } from './api.js';
+  import CategoryWorkspace from './CategoryWorkspace.svelte';
 
   let { apiBase } = $props();
 
@@ -128,6 +129,9 @@
     <button class:active={mode === 'browse'} disabled={!session} onclick={() => (mode = 'browse')}>
       Provider menu
     </button>
+    <button class:active={mode === 'workspace'} disabled={!session} onclick={() => (mode = 'workspace')}>
+      Service workspace
+    </button>
     <button class:active={mode === 'access'} disabled={!session} onclick={() => (mode = 'access')}>
       My access
     </button>
@@ -209,6 +213,28 @@
             </article>
           {/each}
         </div>
+      {/if}
+    </div>
+  {:else if mode === 'workspace' && menu}
+    <div class="mp-panel browse">
+      <div class="field">
+        <label for="ws-category">Service category</label>
+        <select id="ws-category" bind:value={selectedCategory}>
+          {#each menu.categories as cat}
+            <option value={cat.id}>{cat.label}</option>
+          {/each}
+        </select>
+      </div>
+      {#if selectedCategory}
+        {@const catInfo = menu.categories.find((c) => c.id === selectedCategory)}
+        {#if catInfo}
+          <p class="meta">{catInfo.description}</p>
+        {/if}
+        <CategoryWorkspace
+          {client}
+          category={selectedCategory}
+          categoryLabel={catInfo?.label ?? selectedCategory}
+        />
       {/if}
     </div>
   {:else if mode === 'access' && menu}
