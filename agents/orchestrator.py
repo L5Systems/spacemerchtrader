@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from agents.base import BaseAgent
 from agents.inventory_agent import InventoryAgent
+from agents.banking_agent import BankingAgent
 from agents.launch_broker_agent import LaunchBrokerAgent
 from agents.mission_guide_agent import MissionGuideAgent
 from agents.pricing_agent import PricingAgent
@@ -18,6 +19,7 @@ AGENTS: dict[str, BaseAgent] = {
     "routing": RoutingAgent(),
     "launch_broker": LaunchBrokerAgent(),
     "mission_guide": MissionGuideAgent(),
+    "banking": BankingAgent(),
 }
 
 

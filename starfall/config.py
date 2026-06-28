@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     launch_broker_llm_api_key: str | None = None
     launch_broker_llm_api_base: str = "https://api.openai.com/v1"
     launch_broker_llm_model: str = "gpt-4o-mini"
+    launch_broker_llm_verify_ssl: bool = True
 
 
 settings = Settings()

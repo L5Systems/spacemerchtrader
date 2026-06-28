@@ -84,11 +84,16 @@ def get_world_status(db: Session) -> dict:
 def get_player_status(db: Session, client: Client) -> dict:
     profile = get_or_create_profile(db, client.id)
     missions = list_player_missions(db, client.id)
+    from starfall.banking import account_summary
+
+    bank = account_summary(db, client.id)
     return {
         "player": {
             "client_id": client.id,
             "display_name": client.display_name,
             "credits": round(profile.credits, 2),
+            "bank_balance": bank["bank_balance"],
+            "bank_account": bank["account_number"],
             "xp": profile.xp,
             "level": profile.level,
             "reputation": round(profile.reputation, 1),

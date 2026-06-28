@@ -14,6 +14,7 @@ import httpx
 from sqlalchemy.orm import Session
 
 from starfall.config import settings
+from starfall.llm_http import llm_http_client
 from starfall.models import Container, GuidedMission, GuidedMissionStatus, PlayerProfile
 
 logger = logging.getLogger(__name__)
@@ -267,7 +268,7 @@ def _generate_with_llm(brief_hint: str | None) -> dict[str, Any] | None:
     url = f"{settings.launch_broker_llm_api_base.rstrip('/')}/chat/completions"
 
     try:
-        with httpx.Client(timeout=25.0) as client:
+        with llm_http_client(timeout=25.0) as client:
             response = client.post(url, headers=headers, json=body)
             response.raise_for_status()
             content = response.json()["choices"][0]["message"]["content"]

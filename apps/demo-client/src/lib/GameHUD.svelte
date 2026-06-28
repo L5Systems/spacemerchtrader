@@ -170,6 +170,12 @@
         <div class="stats">
           <div><span class="label">Name</span><strong>{player.player.display_name}</strong></div>
           <div><span class="label">Credits</span><strong class="gold">{player.player.credits} cr</strong></div>
+          {#if player.player.bank_account}
+            <div>
+              <span class="label">Bank</span><strong>{player.player.bank_balance} cr</strong>
+              <span class="meta">({player.player.bank_account})</span>
+            </div>
+          {/if}
           <div><span class="label">Level</span><strong>{player.player.level}</strong></div>
           <div><span class="label">XP</span><strong>{player.player.xp}</strong></div>
           <div><span class="label">Reputation</span><strong>{player.player.reputation}</strong></div>

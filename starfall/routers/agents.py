@@ -8,8 +8,15 @@ from agents.orchestrator import AGENTS, run_agent
 from starfall.database import get_db
 from starfall.models import AgentRun, Client
 from starfall.manifest import list_starship_registry
+from starfall.banking import account_summary, list_recent_transactions
 from starfall.routers.marketplace import get_current_client
-from starfall.schemas import AgentRunOut, AgentRunRequest, LaunchBrokerChatRequest, MissionGuideChatRequest
+from starfall.schemas import (
+    AgentRunOut,
+    AgentRunRequest,
+    BankingChatRequest,
+    LaunchBrokerChatRequest,
+    MissionGuideChatRequest,
+)
 
 router = APIRouter(prefix="/agents", tags=["agents"])
 
@@ -90,6 +97,41 @@ def mission_guide_chat(
         "reasoning": run.reasoning,
         "run_id": run.id,
     }
+
+
+@router.post("/banking/chat")
+def banking_chat(
+    body: BankingChatRequest,
+    client: Client = Depends(get_current_client),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    payload = body.model_dump(exclude_none=True)
+    payload["client_id"] = client.id
+    payload["instruction"] = body.instruction
+    run = run_agent(db, "banking", "chat", payload)
+    try:
+        output = json.loads(run.output_json or "{}")
+    except json.JSONDecodeError:
+        output = {}
+    return {
+        "message": output.get("message", ""),
+        "action": output.get("action"),
+        "data": output.get("data"),
+        "suggestions": output.get("suggestions", []),
+        "game_result": output.get("game_result"),
+        "reasoning": run.reasoning,
+        "run_id": run.id,
+    }
+
+
+@router.get("/banking/account")
+def banking_account(
+    client: Client = Depends(get_current_client),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    summary = account_summary(db, client.id)
+    transactions = list_recent_transactions(db, client.id)
+    return {"account": summary, "transactions": transactions}
 
 
 @router.get("/runs/{run_id}", response_model=AgentRunOut)

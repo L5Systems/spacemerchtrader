@@ -116,6 +116,9 @@ export function createClient(baseUrl = DEFAULT_BASE, token) {
     },
     missionGuideChat: (body) =>
       request('/agents/mission_guide/chat', { method: 'POST', body: JSON.stringify(body) }),
+    bankingChat: (body) =>
+      request('/agents/banking/chat', { method: 'POST', body: JSON.stringify(body) }),
+    bankingAccount: () => request('/agents/banking/account'),
     gameWorld: () => request('/game/world'),
     gameMe: () => request('/game/me'),
     gameLeaderboard: () => request('/game/leaderboard'),

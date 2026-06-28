@@ -11,6 +11,7 @@ from typing import Any
 import httpx
 
 from starfall.config import settings
+from starfall.llm_http import llm_http_client
 from starfall.manifest import parse_date_hint, parse_month_hint
 
 logger = logging.getLogger(__name__)
@@ -221,7 +222,7 @@ def plan_with_llm(instruction: str, payload: dict[str, Any]) -> dict[str, Any] |
     url = f"{settings.launch_broker_llm_api_base.rstrip('/')}/chat/completions"
 
     try:
-        with httpx.Client(timeout=20.0) as client:
+        with llm_http_client(timeout=20.0) as client:
             response = client.post(url, headers=headers, json=body)
             response.raise_for_status()
             content = response.json()["choices"][0]["message"]["content"]

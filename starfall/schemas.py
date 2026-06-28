@@ -135,6 +135,15 @@ class MissionGuideChatRequest(BaseModel):
     replace: bool | None = None
 
 
+class BankingChatRequest(BaseModel):
+    instruction: str = Field(..., examples=["balance", "deposit 500", "transfer 100 to trader@starfall.corp"])
+    action: str | None = None
+    amount: float | None = Field(None, gt=0)
+    recipient_email: str | None = None
+    recipient_account: str | None = None
+    memo: str | None = None
+
+
 class AgentRunOut(BaseModel):
     id: str
     agent_id: str

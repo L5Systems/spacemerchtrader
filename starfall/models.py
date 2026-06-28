@@ -575,6 +575,45 @@ class PlayerProfile(Base):
     client: Mapped["Client"] = relationship(back_populates="player_profile")
 
 
+class BankTransactionType(str, enum.Enum):
+    DEPOSIT = "deposit"
+    WITHDRAW = "withdraw"
+    TRANSFER_IN = "transfer_in"
+    TRANSFER_OUT = "transfer_out"
+
+
+class BankAccount(Base):
+    __tablename__ = "bank_accounts"
+
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"), primary_key=True)
+    account_number: Mapped[str] = mapped_column(String(32), unique=True)
+    balance: Mapped[float] = mapped_column(Float, default=0.0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+    client: Mapped["Client"] = relationship()
+    transactions: Mapped[list["BankTransaction"]] = relationship(
+        back_populates="account", cascade="all, delete-orphan"
+    )
+
+
+class BankTransaction(Base):
+    __tablename__ = "bank_transactions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    account_id: Mapped[str] = mapped_column(ForeignKey("bank_accounts.client_id"))
+    transaction_type: Mapped[BankTransactionType] = mapped_column(Enum(BankTransactionType))
+    amount: Mapped[float] = mapped_column(Float)
+    counterparty_client_id: Mapped[str | None] = mapped_column(ForeignKey("clients.id"), nullable=True)
+    counterparty_account: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    memo: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    account: Mapped["BankAccount"] = relationship(back_populates="transactions")
+
+
 class Mission(Base):
     __tablename__ = "missions"
 

@@ -253,6 +253,7 @@
       <p class="tagline">Multiplayer space trading game — haul cargo, run missions, and compete on the galactic leaderboard.</p>
     </div>
     <div class="hero-controls">
+      <a class="nav-link primary-nav" href="#/banking">Galactic Bank →</a>
       <div class="field api-field">
         <label for="api-base">API base URL</label>
         <input id="api-base" bind:value={apiBase} placeholder="/api" />
@@ -578,6 +579,23 @@
     gap: 0.75rem;
     align-items: flex-end;
     flex-wrap: wrap;
+  }
+
+  .nav-link {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.55rem 0.9rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: rgba(58, 158, 95, 0.12);
+    color: inherit;
+    text-decoration: none;
+    font-size: 0.9rem;
+    white-space: nowrap;
+  }
+
+  .nav-link:hover {
+    background: rgba(58, 158, 95, 0.22);
   }
 
   .api-field {
